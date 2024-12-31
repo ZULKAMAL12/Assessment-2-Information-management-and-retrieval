@@ -1,0 +1,28 @@
+.hero {
+    background: url('../images/hotel_hero.jpg') no-repeat center center;
+    background-size: cover;
+    height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: white;
+    text-align: center;
+    padding: 20px;
+}
+
+
+.card-header {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.navbar-brand {
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.btn-primary {
+    background-color: #51a0dc;
+    border-color: #0056b3;
+}
