@@ -42,7 +42,7 @@
     <!-- Footer -->
     <footer class="bg-dark text-white text-center py-3 mt-auto">
         <div class="container">
-            <p>&copy; 2025 TSC Hotel Booking. All Rights Reserved.</p>
+            <p>&copy; TSC Hotel Booking 2025</p>
         </div>
     </footer>
 
