@@ -14,6 +14,13 @@ $roomImages = [
     'Suite' => 'assets/img/suite.jpg',
     'Standard Deluxe' => 'assets/img/standard_deluxe.jpg',
 ];
+
+// Guest capacity mapped by RoomType
+$roomGuestCapacity = [
+    'Family Room' => 4,
+    'Suite' => 2,
+    'Standard Deluxe' => 2,
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -54,8 +61,12 @@ $roomImages = [
                         <a class="nav-link" href="home.php">Home</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="manage_booking.php">Manage Booking</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="logout.php">Logout</a>
                     </li>
+                    
                 </ul>
             </div>
         </div>
@@ -81,6 +92,7 @@ $roomImages = [
             if ($result && mysqli_num_rows($result) > 0) {
                 while ($room = mysqli_fetch_assoc($result)) {
                     $image = isset($roomImages[$room['RoomType']]) ? $roomImages[$room['RoomType']] : 'assets/images/default_room.jpg';
+                    $guestCapacity = isset($roomGuestCapacity[$room['RoomType']]) ? $roomGuestCapacity[$room['RoomType']] : 1;
 
                     echo "
                     <div class='col-md-4'>
@@ -89,7 +101,8 @@ $roomImages = [
                             <div class='card-body'>
                                 <h5 class='card-title'>" . htmlspecialchars($room['RoomType']) . "</h5>
                                 <p class='card-text'>Price: RM " . htmlspecialchars($room['PricePerNight']) . " / Night</p>
-                                <p class='card-text'>Capacity: " . htmlspecialchars($room['Capacity']) . " Guests</p>
+                                <p class='card-text'>Guests: Up to " . htmlspecialchars($guestCapacity) . "</p>
+                                <p class='card-text'>Available Rooms: " . htmlspecialchars($room['Capacity']) . "</p>
                                 <a href='book.php?room_id=" . htmlspecialchars($room['RoomID']) . "' class='btn btn-primary'>Book Now</a>
                             </div>
                         </div>
@@ -106,7 +119,7 @@ $roomImages = [
     <!-- Footer -->
     <footer class="bg-dark text-white text-center py-3">
         <div class="container">
-            <p>&copy; 2025 TSC Hotel Booking. All Rights Reserved.</p>
+            <p>&copy; 2025 TSC Hotel Booking</p>
         </div>
     </footer>
 

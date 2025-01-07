@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Get the room ID from the URL
+// Validate room ID
 if (!isset($_GET['room_id']) || empty($_GET['room_id'])) {
     header('Location: home.php');
     exit();
@@ -25,17 +25,32 @@ if (!$room) {
     exit();
 }
 
+// Define guest capacity based on room type
+$guestCapacity = [
+    'Family Room' => 4,
+    'Suite' => 2,
+    'Standard Deluxe' => 2,
+];
+
+// Get the maximum guest capacity for this room type
+$maxGuests = isset($guestCapacity[$room['RoomType']]) ? $guestCapacity[$room['RoomType']] : 1;
+
+// Handle availability check
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_availability'])) {
     $check_in = mysqli_real_escape_string($conn, $_POST['check_in']);
     $check_out = mysqli_real_escape_string($conn, $_POST['check_out']);
+    $number_of_guests = intval($_POST['number_of_guests']);
 
     // Validate dates
     if (strtotime($check_in) >= strtotime($check_out)) {
         $error = "Check-out date must be after the check-in date.";
+    } elseif ($number_of_guests < 1 || $number_of_guests > $maxGuests) {
+        $error = "Number of guests must be between 1 and $maxGuests.";
     } else {
-        // Check room availability
+        // Check room availability based on capacity
         $availability_query = "
-            SELECT * FROM BookingRoom br
+            SELECT COUNT(br.RoomID) AS booked_rooms
+            FROM BookingRoom br
             INNER JOIN Booking b ON br.BookingID = b.BookingID
             WHERE br.RoomID = $room_id
             AND (
@@ -43,9 +58,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_availability']))
             )
         ";
         $availability_result = mysqli_query($conn, $availability_query);
+        $availability_data = mysqli_fetch_assoc($availability_result);
 
-        if (mysqli_num_rows($availability_result) > 0) {
-            $error = "Room is not available for the selected dates.";
+        $booked_rooms = $availability_data['booked_rooms'];
+        $available_rooms = $room['Capacity'] - $booked_rooms;
+
+        if ($available_rooms <= 0) {
+            $error = "No rooms of this type are available for the selected dates.";
         } else {
             // Calculate total price
             $days = (strtotime($check_out) - strtotime($check_in)) / (60 * 60 * 24);
@@ -55,34 +74,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_availability']))
     }
 }
 
+// Handle booking confirmation and redirect to payment
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_booking'])) {
     $check_in = mysqli_real_escape_string($conn, $_POST['check_in']);
     $check_out = mysqli_real_escape_string($conn, $_POST['check_out']);
+    $number_of_guests = intval($_POST['number_of_guests']);
     $total_price = mysqli_real_escape_string($conn, $_POST['total_price']);
 
-    // Insert booking into Booking table
-    $user_id = $_SESSION['user_id'];
-    $booking_query = "
-        INSERT INTO Booking (CustomerID, CheckInDate, CheckOutDate, NumberOfGuest, TotalPrice)
-        VALUES ($user_id, '$check_in', '$check_out', {$room['Capacity']}, $total_price)
-    ";
-
-    if (mysqli_query($conn, $booking_query)) {
-        $booking_id = mysqli_insert_id($conn);
-
-        // Insert into BookingRoom table
-        $booking_room_query = "
-            INSERT INTO BookingRoom (BookingID, RoomID, Quantity)
-            VALUES ($booking_id, $room_id, 1)
-        ";
-        if (mysqli_query($conn, $booking_room_query)) {
-            header("Location: confirmation.php?booking_id=$booking_id");
-            exit();
-        } else {
-            $error = "Failed to assign the room to the booking.";
-        }
+    // Validate the number of guests
+    if ($number_of_guests < 1 || $number_of_guests > $maxGuests) {
+        $error = "Number of guests must be between 1 and $maxGuests.";
     } else {
-        $error = "Failed to create the booking. Please try again.";
+        // Insert booking into Booking table
+        $user_id = $_SESSION['user_id'];
+        $booking_query = "
+            INSERT INTO Booking (CustomerID, CheckInDate, CheckOutDate, NumberOfGuest, TotalPrice)
+            VALUES ($user_id, '$check_in', '$check_out', $number_of_guests, $total_price)
+        ";
+
+        if (mysqli_query($conn, $booking_query)) {
+            $booking_id = mysqli_insert_id($conn);
+
+            // Insert into BookingRoom table
+            $booking_room_query = "
+                INSERT INTO BookingRoom (BookingID, RoomID, Quantity)
+                VALUES ($booking_id, $room_id, 1)
+            ";
+            if (mysqli_query($conn, $booking_room_query)) {
+                // Redirect to payment page
+                header("Location: payment.php?booking_id=$booking_id");
+                exit();
+            } else {
+                $error = "Failed to assign the room to the booking.";
+            }
+        } else {
+            $error = "Failed to create the booking. Please try again.";
+        }
     }
 }
 ?>
@@ -138,18 +165,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_booking'])) {
                     <label for="check_out" class="form-label">Check-out Date</label>
                     <input type="date" name="check_out" class="form-control" required>
                 </div>
+                <div class="mb-3">
+                    <label for="number_of_guests" class="form-label">Number of Guests</label>
+                    <input type="number" name="number_of_guests" class="form-control" min="1" max="<?php echo $maxGuests; ?>" required>
+                </div>
                 <button type="submit" name="check_availability" class="btn btn-primary w-100">Check Availability</button>
             </form>
         <?php } else { ?>
-            <!-- Confirmation Form -->
+            <!-- Booking Review -->
             <div class="alert alert-success">
-                Room is available! Total Price: RM <?php echo htmlspecialchars($total_price); ?>
+                Room is available! Review your booking details below:
+            </div>
+            <div class="card shadow mt-4">
+                <div class="card-body">
+                    <h4>Booking Summary</h4>
+                    <p><strong>Room Type:</strong> <?php echo htmlspecialchars($room['RoomType']); ?></p>
+                    <p><strong>Check-In Date:</strong> <?php echo htmlspecialchars($check_in); ?></p>
+                    <p><strong>Check-Out Date:</strong> <?php echo htmlspecialchars($check_out); ?></p>
+                    <p><strong>Total Price:</strong> RM <?php echo htmlspecialchars($total_price); ?></p>
+                    <p><strong>Number of Guests:</strong> <?php echo htmlspecialchars($number_of_guests); ?></p>
+                </div>
             </div>
             <form method="POST" class="mt-4">
                 <input type="hidden" name="check_in" value="<?php echo htmlspecialchars($check_in); ?>">
                 <input type="hidden" name="check_out" value="<?php echo htmlspecialchars($check_out); ?>">
                 <input type="hidden" name="total_price" value="<?php echo htmlspecialchars($total_price); ?>">
-                <button type="submit" name="confirm_booking" class="btn btn-success w-100">Confirm Booking</button>
+                <input type="hidden" name="number_of_guests" value="<?php echo htmlspecialchars($number_of_guests); ?>">
+                <button type="submit" name="confirm_booking" class="btn btn-success w-100">Confirm Booking & Proceed to Payment</button>
             </form>
         <?php } ?>
     </main>
