@@ -1,5 +1,6 @@
 <?php
 include('includes/db.php');
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Sanitize and validate inputs
     $name = mysqli_real_escape_string($conn, htmlspecialchars($_POST['name']));
@@ -22,15 +23,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (mysqli_num_rows($result) > 0) {
             $error = "Email is already registered!";
         } else {
-            // Insert new user into the database
-            $query = "INSERT INTO Customer (Name, Email, PhoneNumber, Password) 
-                      VALUES ('$name', '$email', '$phone', '$hashed_password')";
-            if (mysqli_query($conn, $query)) {
+            // Call the stored procedure
+            $stmt = $conn->prepare("CALL InsertCustomer(?, ?, ?, ?)");
+            $stmt->bind_param("ssss", $name, $email, $hashed_password, $phone);
+
+            if ($stmt->execute()) {
                 header('Location: login.php?registered=true');
                 exit();
             } else {
                 $error = "Registration failed. Please try again.";
             }
+
+            $stmt->close();
         }
     }
 }
